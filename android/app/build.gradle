@@ -1,0 +1,38 @@
+plugins { id 'com.android.application' }
+
+def ver = (System.getenv("NATAN_VERSION") ?: "2.5.0")
+def parts = ver.tokenize('.').collect { it.isInteger() ? it.toInteger() : 0 } + [0, 0, 0]
+def code = parts[0] * 10000 + parts[1] * 100 + parts[2]
+
+android {
+    namespace 'app.natan.tutor'
+    compileSdk 34
+    defaultConfig {
+        applicationId "app.natan.tutor"
+        minSdk 24
+        targetSdk 34
+        versionCode code
+        versionName ver
+        buildConfigField "String", "SITO", "\"" + (System.getenv("NATAN_SITO") ?: "https://kacr268698-pixel.github.io/natan/") + "\""
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        release {
+            def ks = System.getenv("NATAN_KEYSTORE")
+            if (ks && new File(ks).exists()) {
+                storeFile file(ks)
+                storePassword System.getenv("NATAN_KS_PASS")
+                keyAlias "natan"
+                keyPassword System.getenv("NATAN_KS_PASS")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("NATAN_KEYSTORE") ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

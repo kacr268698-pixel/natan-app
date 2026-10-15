@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="nero">#000000</color>
+    <color name="sfondo">#15161C</color>
+    <style name="Natan" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/sfondo</item>
+        <item name="android:statusBarColor">@color/sfondo</item>
+        <item name="android:navigationBarColor">@color/sfondo</item>
+        <item name="android:colorAccent">#7C83FF</item>
+    </style>
+</resources>

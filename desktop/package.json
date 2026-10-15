@@ -1,0 +1,30 @@
+{
+  "name": "natan",
+  "productName": "Natan",
+  "version": "2.5.0",
+  "description": "Natan, il tutor AI. Il computer aiuta anche i telefoni degli amici quando il server di Natan è spento.",
+  "main": "main.js",
+  "author": "Natan",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "app.natan.tutor",
+    "productName": "Natan",
+    "copyright": "Natan",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "offline.html", "config.json", "tray.png", "tray-32.png", "package.json"],
+    "artifactName": "Natan-${os}-${arch}.${ext}",
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "signAndEditExecutable": true },
+    "nsis": { "oneClick": true, "perMachine": false, "runAfterFinish": true, "createDesktopShortcut": "always", "createStartMenuShortcut": true, "shortcutName": "Natan", "artifactName": "Natan-Windows.exe" },
+    "mac": { "target": [{ "target": "dir", "arch": ["arm64", "x64"] }], "category": "public.app-category.education", "identity": null, "hardenedRuntime": false },
+    "linux": { "target": [{ "target": "AppImage", "arch": ["x64"] }], "category": "Education", "artifactName": "Natan-Linux.AppImage" }
+  }
+}

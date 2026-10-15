@@ -1,0 +1,108 @@
+# Costruisce le app di Natan (Windows, Mac, Linux, Android) e le mette nella pagina «Releases».
+# Parte da sola quando il Mac di Natan pubblica una nuova versione (etichetta v...).
+name: App di Natan
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  computer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Versione
+        run: |
+          V="$(cat ../VERSIONE)"
+          node -e "const f='package.json';const p=require('./'+f);p.version='$V';require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+      - run: npm install --no-audit --no-fund
+      - name: Windows
+        if: runner.os == 'Windows'
+        run: npx electron-builder --win --publish never
+      - name: Linux
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux --publish never
+      - name: Mac
+        if: runner.os == 'macOS'
+        run: |
+          npx electron-builder --mac --publish never
+          for d in dist/mac-arm64 dist/mac; do
+            [ -d "$d/Natan.app" ] || continue
+            xattr -cr "$d/Natan.app" || true
+            codesign --force --deep --sign - "$d/Natan.app"
+            nome=Natan-Mac-Intel.dmg; [ "$d" = "dist/mac-arm64" ] && nome=Natan-Mac-AppleSilicon.dmg
+            mkdir -p "dmg-$nome"; cp -R "$d/Natan.app" "dmg-$nome/"; ln -s /Applications "dmg-$nome/Applicazioni"
+            hdiutil create -volname "Natan" -srcfolder "dmg-$nome" -ov -format UDZO "dist/$nome"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ runner.os }}
+          path: |
+            desktop/dist/Natan-Windows.exe
+            desktop/dist/Natan-Linux.AppImage
+            desktop/dist/Natan-Mac-*.dmg
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: Firma
+        env:
+          KS: ${{ secrets.NATAN_KEYSTORE }}
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/natan.jks"; echo "NATAN_KEYSTORE=$RUNNER_TEMP/natan.jks" >> "$GITHUB_ENV"; fi
+      - name: Costruisco l'app Android
+        env:
+          NATAN_KS_PASS: ${{ secrets.NATAN_KS_PASS }}
+        run: |
+          export NATAN_VERSION="$(cat VERSIONE)"
+          export NATAN_SITO="$(node -e "console.log(require('./desktop/config.json').sito)")"
+          gradle -p android --no-daemon assembleRelease
+          cp android/app/build/outputs/apk/release/app-release.apk Natan-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-Android
+          path: Natan-Android.apk
+          if-no-files-found: error
+
+  pubblica:
+    needs: [computer, android]
+    if: always() && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pronte
+          merge-multiple: true
+      - name: Metto le app nella pagina Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la pronte
+          [ -n "$(ls pronte)" ] || exit 1
+          T="${GITHUB_REF_NAME}"
+          gh release view "$T" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$T" -R "$GITHUB_REPOSITORY" --title "Natan ${T#v}" --notes "Scarica Natan per il tuo dispositivo dal sito di Natan."
+          gh release upload "$T" pronte/* -R "$GITHUB_REPOSITORY" --clobber
